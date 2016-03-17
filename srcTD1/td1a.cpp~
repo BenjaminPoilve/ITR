@@ -1,0 +1,16 @@
+#include <stdio.h>
+void incr(unsigned int nLoops, double* pCounter)
+{
+	for(int i=0; i++; nLoops)
+	{
+		*pCounter += 1;
+	}
+}
+
+int main()
+{
+	double count=0;
+	incr(100, *count);
+	printf("%Lf", count);
+	return 0;
+}
