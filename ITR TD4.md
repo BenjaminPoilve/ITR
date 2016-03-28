@@ -405,7 +405,7 @@ public:
 Les methodes de cette classe sont les suivantes:
 
 * `ìsEmpty()` nous permet de determiner si la pile est vide
-* `push()' permet d'ajouter un element à la pile:
+* `push()` permet d'ajouter un element à la pile:
 ````C++
 void push(T msg)
 {
@@ -476,7 +476,7 @@ void Produce::run()
 ````
 La grosse difficultée est de permette à la classe Consume de finir, alors meme qu'elle ne doit pas considerer qu'elle a fini quand la pile est vide, car un autre Thread Produce peut encore ajouter des elements dans la Pile; 
 
-Pour cela, on introduit une methode `canFinish()` qui permet de mettre un flag à TRUE quand touts les Thread de production sont terminés.
+Pour cela, on introduit une methode `allowFinish()` qui permet de mettre un flag à TRUE quand touts les Threads de production sont terminés.
 
 ````C++
 for(int i=0; i < nProduce; i++)
