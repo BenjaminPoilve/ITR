@@ -31,7 +31,10 @@ bool Thread::start(int priority)
 	schedParam.sched_priority = priority;
 	pthread_attr_setschedparam(&m_attr, &schedParam);
 	pthread_create(&m_tid, &m_attr, call_run, this); 
-	return true;	
+	return true;
+	
+
+	
 }
 
 

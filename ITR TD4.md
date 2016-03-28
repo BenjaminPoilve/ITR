@@ -161,7 +161,6 @@ int main(int argc, char* argv[])
 }
 ````
 
-[Corentin, il ne manque pas la fonction call_run ici? Le thread tourne-t-il vraiment?]
 
 ##Classes Mutex et Lock
 
@@ -239,7 +238,7 @@ double Incr::Counter::incrementSafe()
 	return value;
 }
 ````
-On voit ici l'interet de la classe lock. Son utilisation est etremement aisée etant donnée qu'on a pas besoin de le detruire manuellement. 
+On voit ici l'interet de la classe lock. Son utilisation est extremement aisée etant donnée qu'on a pas besoin de le detruire manuellement. 
 
 ##Classe Condition
 
@@ -390,69 +389,118 @@ On locke la condition, ajoute un nombre de jeton correspondant aux taches bloqu�
 ##Classe Fifo multitâches
 
 On implemente ensuite un template FIFO.
-Ce template utilise la ``std::queue`` pour stocker des element. Elle possède deux fonctions: le pop et le push classique de la ``queue``avec un mecanisme de signalement par condition
+Ce template utilise la ``std::queue`` pour stocker des element. Elle possède deux fonctions: le pop et le push classique de la ``queue``avec un mecanisme de signalement par condition.
+On implemente ceci dans un .hpp car c'est un template, ce qui nous permet d'utiliser la FIFO sur n'importe quel type de donnée
+
+La classe EmptyException permet de savoir quand la FIFO est vide :
 
 ````C++
-#ifndef Fifo_hpp_INCLUDED
-#define Fifo_hpp_INCLUDED
-#include <exception>
-
-template<typename T> // T type de message.
-class Fifo
-{
 public:
-	class EmptyException : public std::exception
-	{
-	public:
-		const char* what() throw();
-	};
+    class EmptyException : public std::exception
+        {
+        public:
+            const char* what() throw();
+        };
+ ````
+Les methodes de cette classe sont les suivantes:
 
-public:
-	void push(T msg);
-	T pop();
-	T pop(double timeout_ms);
-private:
-	std::queue<T> elements;
-	Condition condition;
-};
-
+* `ìsEmpty()` nous permet de determiner si la pile est vide
+* `push()' permet d'ajouter un element à la pile:
+````C++
 void push(T msg)
 {
-	elements.push(msg);
-	condition.notify();
+    elements.push(msg);
+    condition.notify();
 }
+````
 
-T pop()
-{
-	if(!elements.empty())
-	{
-		elements.pop();
-	}
-	else()
-	{
-		while (elements.empty())
-		{
-			condition.wait(); 
-		}
-	}
-}
+* `pop()`nous permet d'enlever un element de la pile. Il est à noter que, en C++ cette fonction ne renvoie pas l'element dépilé, on utilise donc `front()`pour y acceder:
 
+````C++
 T pop(double timeout_ms)
 {
-	if(!elements.empty())
+    Lock lock(&condition);
+    while(elements.empty())
+        if(!condition.wait(timeout_ms))
+        {
+            throw EmptyException();
+        }
+    T popped = elements.front();
+    elements.pop();
+    return popped;
+}
+````
+Pour tester cette classe, nous construisons deux sous-classes de  Thread qui produisent et consomme des elements de la pile:
+
+* `Consume` qui consomme les elements de la pile. Pour la créé nous nous sommes inspiré de notre classe `Incr()`
+
+````C++
+void Consume::run()
+{
+    while(!(canFinish && m_pFifo->isEmpty()))
+    {
+        int res;    
+        try
+        {
+            res = m_pFifo->pop(20);
+            if(m_pCounter->getMutexUse() == true)
+            {
+                m_pCounter->incrementSafe();        
+            }
+            else
+            {
+                m_pCounter->incrementUnsafe();
+            }
+        }
+        catch (const std::exception& ex)
+        { 
+            std::cout << "Exception" << std::endl;
+        }
+        std::cout << "je suis tjs dans la boucle" << std::endl;
+    }
+    std::cout << "je suis sorti de la boucle" << std::endl;
+}
+````
+
+* `Produce` qui se charge de pusher nPush fois l'entier 42 sur la pile.
+
+````C++
+
+void Produce::run()
+{
+	for(int i=0; i< nPush; i++)
 	{
-		elements.pop();
-	}
-	else()
-	{
-		while (elements.empty())
-		{
-			condition.wait(timeout_ms);
-		}
+		m_pFifo->push(42);
 	}
 }
-
-#endif
 ````
-L’appel à pop() est bloquant si la fifo est vide. Il existe une version avec timeout.
+La grosse difficultée est de permette à la classe Consume de finir, alors meme qu'elle ne doit pas considerer qu'elle a fini quand la pile est vide, car un autre Thread Produce peut encore ajouter des elements dans la Pile; 
 
+Pour cela, on introduit une methode `canFinish()` qui permet de mettre un flag à TRUE quand touts les Thread de production sont terminés.
+
+````C++
+for(int i=0; i < nProduce; i++)
+		{
+			myVectProd[i]->join(20);
+		}
+for(int i=0; i < nConsume; i++)
+		{
+			myVectCons[i]->allowFinish();
+			cout << "allowed " << myVectCons[i]->getFinish() << endl;
+	
+		}
+for(int i=0; i < nConsume; i++)
+		{
+			myVectCons[i]->join(20);
+		}
+
+````
+
+Le main() permet, en ligne de commande combien de specifier le nombre de Thread producteurs et consommateurs à lancer
+
+Bien que les resultats semblent correctes, il reste des problèmes de Deadlock, qui devraient etre compensé par le bloc try/catch et le `canFinish`mais il semble que nous ayons oublié une sécurité car il reste des erreurs, allant parfois jusqu'aux Segfault occasionnel!
+
+
+Le temps nous a malheureusement manqué pour finir le TD5.
+
+Les fichiers sources représentent les evolutions entre les questions, depuis les classes mutex et lock (V1), les conditions et semaphores (V2) et enfin la FIFO (V3)
